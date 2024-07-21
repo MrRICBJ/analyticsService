@@ -17,36 +17,35 @@
 
 **raw_analytics**
 ```sql
-CREATE TABLE raw_analytics (
-   id serial primary key,
-   time timestamptz(0) not null,
-   user_id uuid not null,
-   data jsonb not null,
-   processed boolean default false,
-   delay timestamptz(0) default (now() + interval '5 minutes')
+create table if not exists analytics (
+    id bigserial primary key,
+    timestamptz(0) not null,
+    user_id uuid not null,
+    data jsonb not null
 );
 ```
 
 **analytics**
 ```sql
-CREATE TABLE analytics (
-   id serial primary key,
-   time timestamptz(0) not null,
-   user_id uuid not null,
-   data jsonb not null
+create table if not exists raw_analytics (
+     id bigserial primary key,
+     time timestamptz(0) not null,
+    user_id uuid not null,
+    data jsonb not null,
+    processed boolean default false
 );
 ```
 **Поток работы**:
-- Входящий запрос сохраняется в raw_analytics.
-- Диспетчер выбирает задачи из raw_analytics и отправляет их в очередь задач для воркеров.
-- Воркеры обрабатывают задачи и сохраняют результаты в analytics.
+- Входящий запрос сохраняется в `raw_analytics`.
+- Диспетчер выбирает задачи из `raw_analytics` и отправляет их в очередь задач для воркеров.
+- Воркеры обрабатывают задачи и сохраняют результаты в `analytics`.
 
 **Недоработки**:
 - Логи и трассировка (trace) не настроены.
 - Не решена проблема обработки ошибок. В текущей реализации, если метод ProcessTask в горутине вернул ошибку и мы не смогли обновить переменную processed на false в базе данных (UpdateProcessedData), эта работа будет висеть как processed = true, пока не будет вручную переведена обратно в false.
 
 ***Возможное решение проблемы обработки ошибок***
-- Для решения проблемы, когда задача зависает в состоянии processed = true из-за ошибки обновления, можно добавить колонку delay в таблицу raw_analytics. Это позволит диспетчеру учитывать задержку и повторно обрабатывать задачи, если время delay истекло.
+- Для решения проблемы, когда задача зависает в состоянии `processed = true` из-за ошибки обновления, можно добавить колонку `delay` в таблицу `raw_analytics`. Это позволит диспетчеру учитывать задержку и повторно обрабатывать задачи, если время `delay` истекло.
 
 ## Запуск проекта
 ```shell
